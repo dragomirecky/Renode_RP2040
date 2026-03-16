@@ -60,7 +60,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             this.stable = false;
             this.badwrite = false;
             this.dormant = 0x77616b65;
-            this.count = new LimitTimer(machine.ClockSource, (long)Frequency, this, "XOSC_COUNT", direction: Direction.Descending, enabled: false, workMode: WorkMode.OneShot, eventEnabled: true, autoUpdate: true);
+            this.count = new LimitTimer(machine.ClockSource, (ulong)Frequency, this, "XOSC_COUNT", direction: Direction.Descending, enabled: false, workMode: WorkMode.OneShot, eventEnabled: true, autoUpdate: true);
             this.stagesUsed = 8;
             this.random = new Random();
             DefineRegisters();

@@ -345,7 +345,7 @@ namespace Antmicro.Renode.Peripherals.SPI
       Registers.SSPDR.Define(registers)
         .WithValueField(0, 16, valueProviderCallback: _ =>
         {
-          if (rxBuffer.Count < rxBuffer.Capacity)
+          if (rxBuffer.Count > 0)
           {
             ushort ret;
             rxBuffer.TryDequeue(out ret);
@@ -354,10 +354,30 @@ namespace Antmicro.Renode.Peripherals.SPI
           return 0;
         }, writeCallback: (_, value) =>
         {
-          Logger.Log(LogLevel.Noisy, "SPI" + id + ": Adding to queue: " + value);
+          this.Log(LogLevel.Noisy, "SPI" + id + ": TX byte: 0x" + ((ushort)value).ToString("X2"));
           if (txBuffer.Count < txBuffer.Capacity)
           {
             txBuffer.Enqueue((ushort)value);
+          }
+          if (RegisteredPeripheral != null)
+          {
+            // Immediate register-level transfer: send each queued byte through
+            // the connected SPI slave. This avoids the GPIO bit-bang managed
+            // thread which is too slow at low SPI clock rates.
+            while (txBuffer.Count > 0)
+            {
+              ushort txByte;
+              txBuffer.TryDequeue(out txByte);
+              ushort rxByte = (ushort)RegisteredPeripheral.Transmit((byte)txByte);
+              if (rxBuffer.Count < rxBuffer.Capacity)
+              {
+                rxBuffer.Enqueue(rxByte);
+              }
+            }
+          }
+          else
+          {
+            // No SPI slave registered — fall back to GPIO bit-bang path.
             if (!running)
             {
               running = true;
@@ -369,8 +389,8 @@ namespace Antmicro.Renode.Peripherals.SPI
       Registers.SSPSR.Define(registers)
         .WithFlag(0, FieldMode.Read, valueProviderCallback: _ => txBuffer.Count == 0, name: "SSPSR_TFE")
         .WithFlag(1, FieldMode.Read, valueProviderCallback: _ => txBuffer.Count != txBuffer.Capacity, name: "SSPSR_TNF")
-        .WithFlag(2, FieldMode.Read, valueProviderCallback: _ => rxBuffer.Count == 0, name: "SSPSR_RNE")
-        .WithFlag(3, FieldMode.Read, valueProviderCallback: _ => rxBuffer.Count != rxBuffer.Capacity, name: "SSPSR_RFF")
+        .WithFlag(2, FieldMode.Read, valueProviderCallback: _ => rxBuffer.Count != 0, name: "SSPSR_RNE")
+        .WithFlag(3, FieldMode.Read, valueProviderCallback: _ => rxBuffer.Count == rxBuffer.Capacity, name: "SSPSR_RFF")
         .WithFlag(4, FieldMode.Read, valueProviderCallback: _ => running, name: "SSPSR_BSY");
 
       Registers.SSPCPSR.Define(registers)
