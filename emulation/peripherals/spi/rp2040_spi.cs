@@ -354,16 +354,12 @@ namespace Antmicro.Renode.Peripherals.SPI
           return 0;
         }, writeCallback: (_, value) =>
         {
-          this.Log(LogLevel.Noisy, "SPI" + id + ": TX byte: 0x" + ((ushort)value).ToString("X2"));
           if (txBuffer.Count < txBuffer.Capacity)
           {
             txBuffer.Enqueue((ushort)value);
           }
           if (RegisteredPeripheral != null)
           {
-            // Immediate register-level transfer: send each queued byte through
-            // the connected SPI slave. This avoids the GPIO bit-bang managed
-            // thread which is too slow at low SPI clock rates.
             while (txBuffer.Count > 0)
             {
               ushort txByte;
@@ -377,7 +373,6 @@ namespace Antmicro.Renode.Peripherals.SPI
           }
           else
           {
-            // No SPI slave registered — fall back to GPIO bit-bang path.
             if (!running)
             {
               running = true;
