@@ -42,6 +42,7 @@ namespace Antmicro.Renode.Peripherals.Analog
       this.samplingThread = machine.ObtainManagedThread(Sample, 1);
       this.samplingThread.Stop();
       this.pads = pads;
+      this.IRQ = new GPIO();
       this.DMARequest = new GPIO();
       DefineRegisters();
       Reset();
@@ -159,6 +160,19 @@ namespace Antmicro.Renode.Peripherals.Analog
 
     private void Sample()
     {
+      try
+      {
+        SampleInner();
+      }
+      catch(System.NullReferenceException e)
+      {
+        this.Log(LogLevel.Error, "ADC NullRef in state {0}, selectedInput={1}: {2}",
+            state, selectedInput, e.StackTrace);
+      }
+    }
+
+    private void SampleInner()
+    {
       switch (state)
       {
         case State.Waiting:
@@ -188,7 +202,7 @@ namespace Antmicro.Renode.Peripherals.Analog
         case State.SamplingDone:
           {
             conversionResult = GetSampleFromChannel(selectedInput);
-            if (fifoEnabled)
+            if (fifoEnabled && fifo != null)
             {
               if (fifo.Count == fifoSize)
               {
@@ -250,6 +264,10 @@ namespace Antmicro.Renode.Peripherals.Analog
       }
 
       double sample = 0;
+      if (resdStream == null || sampleProvider == null || defaultSample == null || pads == null)
+      {
+        return 0;
+      }
       if (resdStream[channel] == null)
       {
         if (sampleProvider[channel].TryDequeueNewSample())
